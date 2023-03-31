@@ -3,7 +3,8 @@ import React from "react"
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, SubmitHandler } from "react-hook-form"
-
+import { signIn } from "next-auth/react"
+import { useRouter } from 'next/navigation'
 
 
 const loginSchema = z.object({
@@ -19,15 +20,25 @@ type LoginSchemaType = z.infer<typeof loginSchema>
 
 const Login = () => {
 
-const { register, handleSubmit, watch, formState: { errors } } = useForm<LoginSchemaType>({resolver: zodResolver(loginSchema), mode: 'onBlur'})
-    
+const { register, handleSubmit, watch, formState: { errors } } = useForm<LoginSchemaType>({resolver: zodResolver(loginSchema)})
+const router = useRouter()    
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 
 const onSubmit: SubmitHandler<LoginSchemaType> = async (data) => {
-    await sleep(3000)
-    console.log(data)
+  const res: any = await signIn("credentials", {
+    redirect: true,
+    email: data.email,
+    password: data.password,
+    callbackUrl: "https://facebook.com",
+  })
+
+  if (res.error) {
+    return  console.log("Errors  " + res.error)
+  } else {
+    return router.push("https://facebook.com");
+  }
 }
 
 
@@ -36,7 +47,10 @@ const onSubmit: SubmitHandler<LoginSchemaType> = async (data) => {
     <>
       <div className='flex justify-center items-center h-screen'>
         <div className='w-full max-w-md'>
-          <form onSubmit={handleSubmit(onSubmit)} className='bg-white shadow-lg rounded-lg px-8 py-6'>
+          <form onSubmit={handleSubmit(onSubmit)} className='bg-white shadow-lg rounded-lg px-8 py-6'
+           method="post"
+           action="/api/auth/login/email"
+           >
             <div>
               <input
                 type='text'

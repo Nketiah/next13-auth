@@ -1,0 +1,86 @@
+import NextAuth, { Account, Profile, User } from "next-auth"
+import FacebookProvider from "next-auth/providers/facebook"
+import GoogleProvider from "next-auth/providers/google"
+import GitHubProvider from "next-auth/providers/github"
+import DiscordProvider from "next-auth/providers/discord"
+import TwitterProvider from "next-auth/providers/twitter"
+import Auth0Provider from "next-auth/providers/auth0"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { JWT } from "next-auth/jwt"
+import { Adapter } from "next-auth/adapters"
+
+import { PrismaAdapter } from "@next-auth/prisma-adapter"
+import { prisma } from "@/prisma"
+import bcrypt from "bcryptjs"
+
+
+
+export default NextAuth({
+    adapter: PrismaAdapter(prisma),
+    providers: [
+        CredentialsProvider({
+            name: "Credentials",
+            credentials: {
+                email: {
+                    label: "Email",
+                    type: "text",
+                },
+                password: {
+                    label: "Password",
+                    type: "password",
+                },
+            },
+            async authorize(credentials) {
+                const user = await prisma.user.findUnique({ where: { email: credentials!.email } })
+                if (!user) {
+                    throw new Error("These credentials do not match our record.")
+                }
+                const isMatch = await bcrypt.compare(credentials!.password, user.password)
+
+                if (!isMatch) {
+                    throw new Error("Password is incorrect.")
+                }
+                return user
+            }
+        }),
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+        }),
+    ],
+    secret: process.env.NEXTAUTH_SECRET,
+    session: {
+        strategy: "jwt",
+    },
+    pages: {
+        signIn: "/login",
+    },
+    callbacks: {
+        async jwt({
+            token,
+            user,
+            account,
+            profile,
+            isNewUser
+        }: {
+            token: JWT
+            user?: User | Adapter | undefined
+            account?: Account | null | undefined
+            profile?: Profile | undefined
+            isNewUser?: boolean | undefined
+        }
+        ) {
+            if (user) {
+                token.provider = account?.provider
+            }
+            return token
+        },
+        async session({ session, token }: { session: any; token: JWT }) {
+            if (session.user) {
+                session.user.provider = token.provider
+            }
+            return session
+        }
+    }
+
+})
